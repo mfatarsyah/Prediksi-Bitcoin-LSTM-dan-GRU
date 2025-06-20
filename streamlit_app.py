@@ -32,7 +32,7 @@ st.set_page_config(
 
 # @st.cache_resource digunakan agar model dan scaler hanya di-load sekali saja.
 @st.cache_resource
-def load_prediction_model(model_path='btc_model.h5'):
+def load_prediction_model(model_path='bitcoin_model.h5'):
     """
     Memuat model hybrid LSTM-GRU yang telah dilatih dari file .h5.
     Pastikan file model Anda ada di direktori yang sama dengan script ini.
