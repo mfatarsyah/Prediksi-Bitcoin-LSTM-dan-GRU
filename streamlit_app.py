@@ -1,44 +1,95 @@
-# =======================
-# FILE: generate_dummy_model.py
-# =======================
-
-import numpy as np
+import streamlit as st
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, GRU, Dense
+import numpy as np
+import yfinance as yf
+from datetime import date, timedelta, datetime
+import plotly.graph_objects as go
+from tensorflow.keras.models import load_model
 import joblib
 
-# 1. Generate dummy Bitcoin-like data
-np.random.seed(42)
-data = np.cumsum(np.random.randn(2000) * 50 + 30000)  # Dummy Bitcoin prices
-prices = pd.DataFrame(data, columns=['Close'])
+# Konfigurasi Halaman
+st.set_page_config(
+    page_title="Prediksi Harga Bitcoin",
+    layout="wide"
+)
 
-# 2. Normalize the data
-scaler = MinMaxScaler()
-scaled_data = scaler.fit_transform(prices)
+st.title("Prediksi Harga Bitcoin Menggunakan Hybrid LSTM-GRU")
 
-# 3. Create sequences (X, y) for training
-sequence_length = 60
-X = []
-y = []
-for i in range(sequence_length, len(scaled_data)):
-    X.append(scaled_data[i-sequence_length:i])
-    y.append(scaled_data[i])
-X, y = np.array(X), np.array(y)
-X = X.reshape((X.shape[0], X.shape[1], 1))
+# =====================================================================================
+# Fungsi untuk memuat model dan scaler
+# =====================================================================================
+@st.cache_resource
+def load_model_hybrid(path='bitcoin_model.h5'):
+    return load_model(path)
 
-# 4. Build simple Hybrid LSTM-GRU model
-model = Sequential()
-model.add(LSTM(32, return_sequences=True, input_shape=(X.shape[1], 1)))
-model.add(GRU(32))
-model.add(Dense(1))
+@st.cache_resource
+def load_scaler(path='scaler.joblib'):
+    return joblib.load(path)
 
-model.compile(optimizer='adam', loss='mse')
-model.fit(X, y, epochs=5, batch_size=32, verbose=1)
+@st.cache_data
+def load_bitcoin_data():
+    start_date = '2020-01-01'
+    end_date = date.today().strftime('%Y-%m-%d')
+    data = yf.download('BTC-USD', start=start_date, end=end_date, progress=False)
+    return data[['Close']]
 
-# 5. Save the model and scaler
-model.save("bitcoin_model.h5")
-joblib.dump(scaler, "scaler.joblib")
+# =====================================================================================
+# Tampilan Visualisasi Historis
+# =====================================================================================
+data = load_bitcoin_data()
 
-print("Dummy model and scaler saved successfully.")
+if data is not None and not data.empty:
+    st.subheader("Visualisasi Harga Bitcoin (2020 - Sekarang)")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Harga Historis', line=dict(color='deepskyblue')))
+    fig.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (USD)', yaxis_tickprefix='$', template='plotly_dark')
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.error("Data tidak tersedia. Gagal memuat data dari Yahoo Finance.")
+
+# =====================================================================================
+# Input Prediksi
+# =====================================================================================
+st.markdown("### Masukkan Tanggal untuk Prediksi")
+today = date.today()
+max_prediction_date = today + timedelta(days=30)
+future_date = st.date_input("Pilih Tanggal Prediksi", min_value=today + timedelta(days=1), max_value=max_prediction_date)
+predict_button = st.button("Click here to Predict")
+
+if predict_button:
+    model = load_model_hybrid()
+    scaler = load_scaler()
+    sequence_length = 60
+
+    if len(data) < sequence_length:
+        st.error("Data historis tidak cukup untuk prediksi.")
+    else:
+        try:
+            last_sequence = data['Close'].values[-sequence_length:]
+            scaled_sequence = scaler.transform(last_sequence.reshape(-1, 1))
+            current_batch = scaled_sequence.reshape(1, sequence_length, 1)
+
+            days_to_predict = (future_date - data.index[-1].date()).days
+            if days_to_predict <= 0:
+                st.warning("Tanggal prediksi harus setelah data historis terakhir.")
+            else:
+                predictions = []
+                for _ in range(days_to_predict):
+                    pred = model.predict(current_batch, verbose=0)[0]
+                    predictions.append(pred)
+                    current_batch = np.append(current_batch[:, 1:, :], [[pred]], axis=1)
+
+                predicted_prices = scaler.inverse_transform(predictions)
+
+                st.subheader("Hasil Prediksi Harga Bitcoin")
+                pred_dates = [data.index[-1] + timedelta(days=i+1) for i in range(days_to_predict)]
+
+                fig_pred = go.Figure()
+                fig_pred.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Harga Historis', line=dict(color='deepskyblue')))
+                fig_pred.add_trace(go.Scatter(x=pred_dates, y=predicted_prices.flatten(), name='Prediksi', line=dict(color='tomato', dash='dash')))
+                fig_pred.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (USD)', yaxis_tickprefix='$', template='plotly_dark')
+                st.plotly_chart(fig_pred, use_container_width=True)
+
+                st.metric("Prediksi Harga pada {}".format(future_date.strftime('%d %B %Y')), f"${predicted_prices[-1][0]:,.2f}")
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat melakukan prediksi: {e}")
