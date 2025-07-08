@@ -37,18 +37,24 @@ def load_bitcoin_data():
 # =====================================================================================
 # Tampilan Visualisasi Historis
 # =====================================================================================
-st.subheader("Visualisasi Harga Bitcoin (2020 - Sekarang)")
 data = load_bitcoin_data()
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Harga Historis', line=dict(color='deepskyblue')))
-fig.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (USD)', yaxis_tickprefix='$', template='plotly_dark')
-st.plotly_chart(fig, use_container_width=True)
+
+if data is not None and not data.empty:
+    st.subheader("Visualisasi Harga Bitcoin (2020 - Sekarang)")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Harga Historis', line=dict(color='deepskyblue')))
+    fig.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (USD)', yaxis_tickprefix='$', template='plotly_dark')
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.error("Data tidak tersedia. Gagal memuat data dari Yahoo Finance.")
 
 # =====================================================================================
 # Input Prediksi
 # =====================================================================================
 st.markdown("### Masukkan Tanggal untuk Prediksi")
-future_date = st.date_input("Pilih Tanggal Prediksi", min_value=date.today() + timedelta(days=1), max_value=date.today() + timedelta(days=30))
+today = date.today()
+max_prediction_date = today + timedelta(days=30)
+future_date = st.date_input("Pilih Tanggal Prediksi", min_value=today + timedelta(days=1), max_value=max_prediction_date)
 predict_button = st.button("Click here to Predict")
 
 if predict_button:
@@ -59,28 +65,32 @@ if predict_button:
     if len(data) < sequence_length:
         st.error("Data historis tidak cukup untuk prediksi.")
     else:
-        last_sequence = data['Close'].values[-sequence_length:]
-        scaled_sequence = scaler.transform(last_sequence.reshape(-1, 1))
-        current_batch = scaled_sequence.reshape(1, sequence_length, 1)
+        try:
+            last_sequence = data['Close'].values[-sequence_length:]
+            scaled_sequence = scaler.transform(last_sequence.reshape(-1, 1))
+            current_batch = scaled_sequence.reshape(1, sequence_length, 1)
 
-        days_to_predict = (future_date - data.index[-1].date()).days
-        predictions = []
+            days_to_predict = (future_date - data.index[-1].date()).days
+            if days_to_predict <= 0:
+                st.warning("Tanggal prediksi harus setelah data historis terakhir.")
+            else:
+                predictions = []
+                for _ in range(days_to_predict):
+                    pred = model.predict(current_batch, verbose=0)[0]
+                    predictions.append(pred)
+                    current_batch = np.append(current_batch[:, 1:, :], [[pred]], axis=1)
 
-        for _ in range(days_to_predict):
-            pred = model.predict(current_batch, verbose=0)[0]
-            predictions.append(pred)
-            current_batch = np.append(current_batch[:, 1:, :], [[pred]], axis=1)
+                predicted_prices = scaler.inverse_transform(predictions)
 
-        predicted_prices = scaler.inverse_transform(predictions)
+                st.subheader("Hasil Prediksi Harga Bitcoin")
+                pred_dates = [data.index[-1] + timedelta(days=i+1) for i in range(days_to_predict)]
 
-        # Visualisasi Hasil
-        st.subheader("Hasil Prediksi Harga Bitcoin")
-        pred_dates = [data.index[-1] + timedelta(days=i+1) for i in range(days_to_predict)]
+                fig_pred = go.Figure()
+                fig_pred.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Harga Historis', line=dict(color='deepskyblue')))
+                fig_pred.add_trace(go.Scatter(x=pred_dates, y=predicted_prices.flatten(), name='Prediksi', line=dict(color='tomato', dash='dash')))
+                fig_pred.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (USD)', yaxis_tickprefix='$', template='plotly_dark')
+                st.plotly_chart(fig_pred, use_container_width=True)
 
-        fig_pred = go.Figure()
-        fig_pred.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Harga Historis', line=dict(color='deepskyblue')))
-        fig_pred.add_trace(go.Scatter(x=pred_dates, y=predicted_prices.flatten(), name='Prediksi', line=dict(color='tomato', dash='dash')))
-        fig_pred.update_layout(xaxis_title='Tanggal', yaxis_title='Harga (USD)', yaxis_tickprefix='$', template='plotly_dark')
-        st.plotly_chart(fig_pred, use_container_width=True)
-
-        st.metric("Prediksi Harga pada {}".format(future_date.strftime('%d %B %Y')), f"${predicted_prices[-1][0]:,.2f}")
+                st.metric("Prediksi Harga pada {}".format(future_date.strftime('%d %B %Y')), f"${predicted_prices[-1][0]:,.2f}")
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat melakukan prediksi: {e}")
