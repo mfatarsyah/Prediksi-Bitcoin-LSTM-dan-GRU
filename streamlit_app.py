@@ -9,7 +9,7 @@ import joblib
 
 # Konfigurasi Halaman
 st.set_page_config(page_title="Prediksi Harga Bitcoin", page_icon="💰", layout="wide")
-st.title("Prediksi dan Visualisasi Harga Bitcoin")
+st.title("Prediksi Harga Bitcoin Menggunakan Algoritma Hybrid LSTM-GRU")
 
 # Fungsi data historis dengan CryptoCompare
 @st.cache_data
@@ -31,7 +31,7 @@ def load_model_scaler():
 # Ambil data
 try:
     close = get_historical_cc()
-    st.subheader("📈 Grafik Harga Bitcoin (≈4 tahun terakhir)")
+    st.subheader("📈 Grafik Harga Bitcoin)")
     fig = go.Figure([go.Scatter(x=close.index, y=close.values, mode='lines')])
     st.plotly_chart(fig, use_container_width=True)
 except Exception as e:
@@ -41,7 +41,7 @@ except Exception as e:
 st.markdown("### Pilih tanggal prediksi")
 future = st.date_input("Tanggal", min_value=date.today() + timedelta(days=1),
                        max_value=date.today() + timedelta(days=30))
-if st.button("Click here to Predict"):
+if st.button("Klik disini untuk Memprediksi"):
     model, scaler = load_model_scaler()
     seq_len = 60
     if len(close) < seq_len:
