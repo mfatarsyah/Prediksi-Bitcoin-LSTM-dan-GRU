@@ -19,6 +19,7 @@ def get_historical_cc():
     resp = requests.get(url).json()
     df = pd.DataFrame(resp['Data']['Data'])
     df['time'] = pd.to_datetime(df['time'], unit='s')
+    df = df[df['time'] >= '2020-01-01'] 
     return df.set_index('time')['close']
 
 # Model & scaler dummy
