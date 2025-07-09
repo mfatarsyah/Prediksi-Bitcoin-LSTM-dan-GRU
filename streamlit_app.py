@@ -44,31 +44,31 @@ future = st.date_input("Tanggal", min_value=date.today() + timedelta(days=1),
                        max_value=date.today() + timedelta(days=365))
 if st.button("Klik disini untuk Memprediksi"):
     with st.spinner("🔄 Sedang memproses prediksi..."):
-    model, scaler = load_model_scaler()
-    seq_len = 60
-    if len(close) < seq_len:
-        st.error("Data historis tidak cukup.")
-    else:
-        arr = close.values[-seq_len:].reshape(-1,1)
-        scaled = scaler.transform(arr)
-        batch = scaled.reshape(1, seq_len, 1)
-        days = (future - close.index[-1].date()).days
-        if days <= 0:
-            st.warning("Tanggal harus setelah data historis terakhir.")
+        model, scaler = load_model_scaler()
+        seq_len = 60
+        if len(close) < seq_len:
+            st.error("Data historis tidak cukup.")
         else:
-            preds = []
-            for _ in range(days):
-                p = model.predict(batch, verbose=0)[0]
-                preds.append(p)
-                batch = np.append(batch[:,1:,:], [[p]], axis=1)
-            us = scaler.inverse_transform(preds).flatten()
-            dt = [close.index[-1] + timedelta(days=i+1) for i in range(days)]
+            arr = close.values[-seq_len:].reshape(-1,1)
+            scaled = scaler.transform(arr)
+            batch = scaled.reshape(1, seq_len, 1)
+            days = (future - close.index[-1].date()).days
+            if days <= 0:
+                st.warning("Tanggal harus setelah data historis terakhir.")
+            else:
+                preds = []
+                for _ in range(days):
+                    p = model.predict(batch, verbose=0)[0]
+                    preds.append(p)
+                    batch = np.append(batch[:,1:,:], [[p]], axis=1)
+                us = scaler.inverse_transform(preds).flatten()
+                dt = [close.index[-1] + timedelta(days=i+1) for i in range(days)]
             
             # Tampilkan grafik
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=close.index, y=close.values, name='Historis'))
-            fig2.add_trace(go.Scatter(x=dt, y=us, name='Prediksi', line=dict(dash='dash')))
-            st.plotly_chart(fig2, use_container_width=True)
+                fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=close.index, y=close.values, name='Historis'))
+                fig2.add_trace(go.Scatter(x=dt, y=us, name='Prediksi', line=dict(dash='dash')))
+                st.plotly_chart(fig2, use_container_width=True)
             
             # Tampilkan harga terakhir prediksi
-            st.metric(f"Harga diprediksi pada {future}", f"${us[-1]:,.2f}")
+                st.metric(f"Harga diprediksi pada {future}", f"${us[-1]:,.2f}")
