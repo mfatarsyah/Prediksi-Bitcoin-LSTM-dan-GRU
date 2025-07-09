@@ -43,6 +43,7 @@ st.markdown("### Pilih tanggal prediksi")
 future = st.date_input("Tanggal", min_value=date.today() + timedelta(days=1),
                        max_value=date.today() + timedelta(days=365))
 if st.button("Klik disini untuk Memprediksi"):
+    with st.spinner("🔄 Sedang memproses prediksi..."):
     model, scaler = load_model_scaler()
     seq_len = 60
     if len(close) < seq_len:
