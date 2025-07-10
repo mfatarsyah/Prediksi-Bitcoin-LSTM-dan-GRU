@@ -32,7 +32,7 @@ def load_model_scaler():
 # Ambil data
 try:
     close = get_historical_cc()
-    st.subheader("📈 Grafik Harga Bitcoin)")
+    st.subheader("📈 Grafik Harga Bitcoin")
     fig = go.Figure([go.Scatter(x=close.index, y=close.values, mode='lines')])
     st.plotly_chart(fig, use_container_width=True)
 except Exception as e:
