@@ -67,7 +67,7 @@ if st.button("Klik disini untuk Memprediksi"):
             # Tampilkan grafik
                 fig2 = go.Figure()
                 fig2.add_trace(go.Scatter(x=close.index, y=close.values, name='Historis'))
-                fig2.add_trace(go.Scatter(x=dt, y=us, name='Prediksi', line=dict(dash='dash')))
+                fig2.add_trace(go.Scatter(x=dt, y=us, name='Prediksi', line=dict(color='red')))
                 st.plotly_chart(fig2, use_container_width=True)
             
             # Tampilkan harga terakhir prediksi
